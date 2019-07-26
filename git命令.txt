@@ -1,0 +1,21 @@
+git init   ---- 初始化某文件夹
+
+git clone %git地址%  ----  克隆某个仓库中的地址
+
+git remote rm %远程库名字%  ----- 删除某个远程库
+
+git remote add %远程库名字% %远程库地址%  ---- 添加某个远程库
+
+git add %文件名%  ---- 添加某个文件到缓存区
+
+git commit -m %本次提交的说明% ---- 缓存区添加到仓库
+
+git log ---- 查看历史纪录
+
+git reset --hard HEAD^  ----回到上个版本（HEAD表示对方前版本，一个^表示上一个版本，^^两个版本）
+
+git reflog  ---- 查看每一次命令
+
+git status  -----查看状态
+
+
