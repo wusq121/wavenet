@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+from exceptions import InputSizeError 
 
 class CausalConv1d(nn.Conv1d):
     """
@@ -22,15 +23,15 @@ class CausalConv1d(nn.Conv1d):
         groups=1,
         bias=True
     ):
-    """
-    :param in_channels: number of channels in the input data;
-    :param out_channels: number of channels produced by the convolution;
-    :param kernel_size: size of the convolving kernel;
-    :param stride: stride of the convolution. Default: 1;
-    :param dilation: spacing between kernel elements, and determining the left padding. Default: 1.
-    :param groups: number of blocked connections from input channels to out channels. Default: 1;
-    :param bias: if True, add a learnable bias to the output. Default: 1.
-    """
+        """
+        :param in_channels: number of channels in the input data;
+        :param out_channels: number of channels produced by the convolution;
+        :param kernel_size: size of the convolving kernel;
+        :param stride: stride of the convolution. Default: 1;
+        :param dilation: spacing between kernel elements, and determining the left padding. Default: 1.
+        :param groups: number of blocked connections from input channels to out channels. Default: 1;
+        :param bias: if True, add a learnable bias to the output. Default: 1.
+        """
         super(CausalConv1d,self).__init__(
             in_channels=in_channels,
             out_channels=out_channels,
@@ -158,6 +159,78 @@ class ResidualStack(nn.Module):
             skip_connections.append(skip)
         
         return torch.stack(skip_connections)
+
+class DensNet(nn.Module):
+    """
+    the last network of wavenet
+    :param x: input data(skip_connections)
+    """
+    def __init__(self, channels):
+        """
+        :param channels: number of channels for input and output
+        """
+        super(DensNet, self).__init__()
+
+        self.conv1 = nn.Conv1d(channels, channels, 1)
+        self.conv2 = nn.Conv2d(channels, channels, 1)
+
+    def forward(self, x):
+        output = self.conv1(F.relu(x))
+        output = self.conv2(F.relu(output))
+
+        output = F.softmax(output)
+
+        return output
+        
+
+class WaveNet(nn.Module):
+    """
+    The size of timestep (3rd dimension) has to larger than receptive fields.
+    :param x: Tensor[batch, channels, timestep]
+    """
+    def __init__(self, layers, stacks, in_channels, res_channels):
+        """
+        :param layers: 
+        :param stacks:
+        :param in_channels: number of channels for input data, skip_channel in same as input channel;
+        :param res_channels: number of residual for input, output.
+        """
+        super(WaveNet, self).__init__()
+
+        self.receptive_fields = self._receptive_field(layers, stacks)
+        self.causal = CausalConv1d(in_channels, res_channels, 2, bias=False)
+        self.res_stack = ResidualStack(layers, stacks, res_channels, in_channels)
+        self.densnet = DensNet(in_channels)
+    
+    @staticmethod
+    def _receptive_filed(layers, stacks):
+        layer = [2 ** i for i in range(layers)] * stacks
+        num_receptive_field = np.sum(layer)
+        
+        return int(num_receptive_field)
+    
+    def calc_out_size(self, x):
+        out_size = int(x.size(2)) - self.receptive_fields
+
+        self.check_input_size(x)
+
+        return out_size
+    
+
+    def check_input_size(self, x, output_size):
+        if output_size < 1:
+            raise InputSizeError(int(x.size(2)), self.receptive_fields, output_size)
+    
+
+    def forward(self, x):
+        output_size = self.calc_out_size(x)
+        output = self.causal(x)
+        skip_connections = self.res_stack(output, output_size)
+        output = torch.sum(skip_connections, dim=0)
+        output = self.densnet(output)
+        return output.contiguous()
+
+
 
 
 
