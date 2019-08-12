@@ -212,7 +212,7 @@ class WaveNet(nn.Module):
     def calc_out_size(self, x):
         out_size = int(x.size(2)) - self.receptive_fields
 
-        self.check_input_size(x)
+        self.check_input_size(x, out_size)
 
         return out_size
     
@@ -229,10 +229,6 @@ class WaveNet(nn.Module):
         output = torch.sum(skip_connections, dim=0)
         output = self.densnet(output)
         return output.contiguous()
-
-
-
-
 
 
 
