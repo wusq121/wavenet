@@ -20,13 +20,16 @@ def load_audio(filename, sample_rate=22500, trim=True, trim_frame_length=2048):
 
 
 def one_hot_encode(data, channels=256):
-    one_hot = np.zeros((data.size, channels), dtype=float)
-    one_hot[np.arange(data.size), data.revel()] = 1
+    """
+    the return of this function is a numpy array shaped as [C(channels), L(timestep)]
+    """
+    one_hot = np.zeros((channels, data.size), dtype=float)
+    one_hot[data.ravel(), np.arange(data.size)] = 1
 
     return one_hot
 
 
-def one_hot_decode(data, axis=1):
+def one_hot_decode(data, axis=0):
     decoded = np.argmax(data, axis=axis)
 
     return decoded
@@ -53,6 +56,9 @@ def quantize_decode(quantized, quantization=256):
 
 
 class Audioset(data.Dataset):
+    """
+    When get an item in the dataset, the audio is shaped as [C(channel), L(timestep)]
+    """
     def __init__(self, data_dir, sample_rate=22500, in_channels=256,
                  trim=True):
         super(Audioset, self).__init__()
@@ -136,4 +142,5 @@ class DataLoader(data.DataLoader):
         
         else:
             targets = audio[:, self.receptive_field:, :]
-            return self._variable(audio), self._variable(ohd)
+            return self._variable(audio), self._variable(one_hot_decode(targets, 2))
+        
